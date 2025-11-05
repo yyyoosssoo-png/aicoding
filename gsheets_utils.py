@@ -131,47 +131,55 @@ REQUIRED_SHEETS: Dict[str, List[str]] = {
 
 def _get_credentials(service_account_file: Optional[str] = None) -> Credentials:
     """서비스 계정 인증 정보 가져오기 (Streamlit Cloud & 로컬 지원)"""
-    try:
-        import streamlit as st
-        
-        # 1. Streamlit Secrets에서 JSON 문자열로 읽기 (Streamlit Cloud)
-        if "GOOGLE_CREDENTIALS" in st.secrets:
-            creds_dict = json.loads(st.secrets["GOOGLE_CREDENTIALS"])
-            scopes = [
-                "https://www.googleapis.com/auth/spreadsheets",
-                "https://www.googleapis.com/auth/drive",
-            ]
-            creds = Credentials.from_service_account_info(creds_dict, scopes=scopes)
-            return creds
-    except Exception:
-        pass  # Secrets 실패 시 로컬 파일로 fallback
-    
-    # 2. 로컬 파일 사용 (개발 환경)
-    file_path = service_account_file or os.getenv(
-        SERVICE_ACCOUNT_FILE_ENV_KEY, "huhsame-service-account-key.json"
-    )
+    import json
+    import sys
     
     scopes = [
         "https://www.googleapis.com/auth/spreadsheets",
         "https://www.googleapis.com/auth/drive",
     ]
     
-    if os.path.exists(file_path):
-        creds = Credentials.from_service_account_file(file_path, scopes=scopes)
+    # Streamlit Secrets 시도
+    try:
+        import streamlit as st
         
-        # Refresh token if needed
+        # TOML 섹션 형식 먼저 시도
+        if "gcp_service_account" in st.secrets:
+            print("DEBUG: Using gcp_service_account from secrets", file=sys.stderr)
+            creds = Credentials.from_service_account_info(
+                dict(st.secrets["gcp_service_account"]),
+                scopes=scopes
+            )
+            return creds
+        
+        # JSON 문자열 형식 시도
+        if "GOOGLE_CREDENTIALS" in st.secrets:
+            print("DEBUG: Using GOOGLE_CREDENTIALS from secrets", file=sys.stderr)
+            creds_dict = json.loads(st.secrets["GOOGLE_CREDENTIALS"])
+            creds = Credentials.from_service_account_info(creds_dict, scopes=scopes)
+            return creds
+            
+    except Exception as e:
+        print(f"DEBUG: Secrets 실패: {e}", file=sys.stderr)
+    
+    # 로컬 파일
+    file_path = service_account_file or os.getenv(
+        SERVICE_ACCOUNT_FILE_ENV_KEY, "service-account.json"
+    )
+    
+    if os.path.exists(file_path):
+        print(f"DEBUG: Using local file: {file_path}", file=sys.stderr)
+        creds = Credentials.from_service_account_file(file_path, scopes=scopes)
         if creds.expired and creds.refresh_token:
             creds.refresh(Request())
-        
         return creds
     
-    # 3. 둘 다 실패
     raise FileNotFoundError(
         "서비스 계정 인증 정보를 찾을 수 없습니다.\n"
-        "Streamlit Cloud: Secrets에 'GOOGLE_CREDENTIALS' 설정 필요.\n"
-        "로컬: JSON 파일 경로 확인 필요."
+        "Streamlit Cloud: Secrets에 'gcp_service_account' 설정 필요.\n"
+        "로컬: service-account.json 파일 필요."
     )
-
+    
 
 def get_client(service_account_file: Optional[str] = None) -> gspread.Client:
     creds = _get_credentials(service_account_file)
