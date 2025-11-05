@@ -665,7 +665,6 @@ def get_responses_v2(spreadsheet: gspread.Spreadsheet, course_id: str = None,
     return responses
 
 
-def save
 def save_insight(spreadsheet: gspread.Spreadsheet, insight: Dict[str, str]) -> None:
     """새 스키마: 인사이트 저장 (대시보드용)"""
     ws = spreadsheet.worksheet("Insights")
