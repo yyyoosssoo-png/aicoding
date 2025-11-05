@@ -1,5 +1,3 @@
-네! 전체 코드를 드릴게요. `gsheets_utils.py` 파일 전체를 이것으로 교체하세요:
-
 ```python
 import os
 import re
