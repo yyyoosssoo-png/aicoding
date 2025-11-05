@@ -136,7 +136,42 @@ def _get_credentials(service_account_file: Optional[str] = None) -> Credentials:
         "https://www.googleapis.com/auth/spreadsheets",
         "https://www.googleapis.com/auth/drive",
     ]
-    creds = Credentials.from_service_account_file(file_path, scopes=scopes)
+    import streamlit as st
+from google.oauth2 import service_account
+import os
+
+def _get_credentials(service_account_file=None):
+    scopes = [
+        'https://www.googleapis.com/auth/spreadsheets',
+        'https://www.googleapis.com/auth/drive'
+    ]
+    
+    # Streamlit Cloud에서 실행 중인지 확인 (Secrets 사용)
+    try:
+        if "gcp_service_account" in st.secrets:
+            # Streamlit Secrets에서 직접 읽기
+            creds = service_account.Credentials.from_service_account_info(
+                st.secrets["gcp_service_account"],
+                scopes=scopes
+            )
+            return creds
+    except Exception as e:
+        pass  # Secrets가 없으면 로컬 파일 시도
+    
+    # 로컬 개발 환경 (파일 사용)
+    if service_account_file and os.path.exists(service_account_file):
+        creds = service_account.Credentials.from_service_account_file(
+            service_account_file,
+            scopes=scopes
+        )
+        return creds
+    
+    # 둘 다 실패
+    raise FileNotFoundError(
+        "서비스 계정 인증 정보를 찾을 수 없습니다. "
+        "Streamlit Cloud: Secrets에 'gcp_service_account' 설정 필요. "
+        "로컬: JSON 파일 경로 확인 필요."
+    )
     # Refresh token if needed
     if creds.expired and creds.refresh_token:
         creds.refresh(Request())
